@@ -1,0 +1,68 @@
+{
+    "manifest_version": 3,
+    "name": "AI Brain",
+    "version": "1.0.0",
+    "description": "Your personal AI memory layer across all LLM platforms",
+    "permissions": [
+        "storage",
+        "activeTab",
+        "scripting"
+    ],
+    "host_permissions": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://www.perplexity.ai/*",
+        "https://gemini.google.com/*",
+        "https://x.com/i/grok*"
+    ],
+    "background": {
+        "service_worker": "src/background/index.js",
+        "type": "module"
+    },
+    "action": {
+        "default_popup": "popup.html",
+        "default_icon": {
+            "16": "icon16.png",
+            "48": "icon48.png",
+            "128": "icon128.png"
+        }
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://chat.openai.com/*",
+                "https://chatgpt.com/*",
+                "https://claude.ai/*",
+                "https://www.perplexity.ai/*",
+                "https://gemini.google.com/*",
+                "https://x.com/i/grok*"
+            ],
+            "js": [
+                "src/universalContent/index.js"
+            ],
+            "run_at": "document_idle"
+        }
+    ],
+    "commands": {
+        "capture-memory": {
+            "suggested_key": {
+                "default": "Ctrl+M",
+                "mac": "Command+M"
+            },
+            "description": "Capture current conversation to memory"
+        },
+        "search-memory": {
+            "suggested_key": {
+                "default": "Ctrl+Shift+M",
+                "mac": "Command+Shift+M"
+            },
+            "description": "Search and insert memories"
+        }
+    },
+    "icons": {
+        "16": "icon16.png",
+        "48": "icon48.png",
+        "128": "icon128.png"
+    }
+}
