@@ -9,6 +9,7 @@ const STORE_NAME = 'memories';
 export class BrowserStore implements MemoryStore {
     private db: IDBDatabase | null = null;
     private initialized = false;
+    private operationQueue: Promise<void> = Promise.resolve();
 
     async init(): Promise<void> {
         if (this.initialized) return;
@@ -32,49 +33,72 @@ export class BrowserStore implements MemoryStore {
         });
     }
 
-    async saveMemory(memory: Memory): Promise<string> {
-        await this.init();
-        return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction([STORE_NAME], 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.add(memory);
+    /**
+     * Queue an operation to prevent race conditions
+     */
+    private queueOperation<T>(operation: () => Promise<T>): Promise<T> {
+        const result = this.operationQueue.then(operation);
+        this.operationQueue = result.then(() => {}, () => {});
+        return result;
+    }
 
-            request.onsuccess = () => resolve(memory.id);
-            request.onerror = () => reject(request.error);
+    async saveMemory(memory: Memory): Promise<string> {
+        return this.queueOperation(async () => {
+            await this.init();
+            return new Promise((resolve, reject) => {
+                const transaction = this.db!.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                // Use put() instead of add() to handle duplicate keys (upsert behavior)
+                const request = store.put(memory);
+
+                request.onsuccess = () => resolve(memory.id);
+                request.onerror = () => reject(request.error);
+            });
         });
     }
 
     async updateMemory(id: string, patch: Partial<Memory>): Promise<void> {
-        await this.init();
-        const memory = await this.getMemory(id);
-        if (!memory) throw new Error("Memory not found");
+        return this.queueOperation(async () => {
+            await this.init();
+            const memory = await this.getMemoryInternal(id);
+            if (!memory) throw new Error("Memory not found");
 
-        const updated = { ...memory, ...patch, updatedAt: Date.now() };
+            const updated = { ...memory, ...patch, updatedAt: Date.now() };
 
-        return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction([STORE_NAME], 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.put(updated);
+            return new Promise((resolve, reject) => {
+                const transaction = this.db!.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.put(updated);
 
-            request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
         });
     }
 
     async deleteMemory(id: string): Promise<void> {
-        await this.init();
-        return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction([STORE_NAME], 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.delete(id);
+        return this.queueOperation(async () => {
+            await this.init();
+            return new Promise((resolve, reject) => {
+                const transaction = this.db!.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.delete(id);
 
-            request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
         });
     }
 
     async getMemory(id: string): Promise<Memory | null> {
         await this.init();
+        return this.getMemoryInternal(id);
+    }
+
+    /**
+     * Internal method for getting a single memory (used within queued operations)
+     */
+    private async getMemoryInternal(id: string): Promise<Memory | null> {
         return new Promise((resolve, reject) => {
             const transaction = this.db!.transaction([STORE_NAME], 'readonly');
             const store = transaction.objectStore(STORE_NAME);
@@ -120,7 +144,12 @@ export class BrowserStore implements MemoryStore {
         return memories.slice(0, limit);
     }
 
-    private async getAllMemories(): Promise<Memory[]> {
+    /**
+     * Get all memories from the store
+     * Public method for external access (e.g., export, sync)
+     */
+    async getAllMemories(): Promise<Memory[]> {
+        await this.init();
         return new Promise((resolve, reject) => {
             const transaction = this.db!.transaction([STORE_NAME], 'readonly');
             const store = transaction.objectStore(STORE_NAME);
@@ -132,10 +161,33 @@ export class BrowserStore implements MemoryStore {
     }
 
     private matchesFilter(memory: Memory, filter: MemoryFilter): boolean {
-        // Same logic as LocalStore
+        // Type filter
         if (filter.type && memory.type !== filter.type) return false;
+
+        // Scope filter
         if (filter.scope && memory.scope !== filter.scope) return false;
-        // ... complete implementation similar to LocalStore
+
+        // Tags filter - memory must have ALL specified tags
+        if (filter.tags && filter.tags.length > 0) {
+            const hasAllTags = filter.tags.every(tag =>
+                memory.tags.includes(tag)
+            );
+            if (!hasAllTags) return false;
+        }
+
+        // Platform filter
+        if (filter.platform && memory.source.platform !== filter.platform) {
+            return false;
+        }
+
+        // Date range filter
+        if (filter.startDate && memory.createdAt < filter.startDate) {
+            return false;
+        }
+        if (filter.endDate && memory.createdAt > filter.endDate) {
+            return false;
+        }
+
         return true;
     }
 }

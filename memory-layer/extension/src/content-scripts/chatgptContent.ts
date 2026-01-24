@@ -13,9 +13,31 @@ function getInteractiveText() {
             text += `[Message]: ${(el as HTMLElement).innerText}\n`;
         });
     } else if (url.includes('perplexity.ai')) {
-        // Perplexity class names are dynamic/obfuscated often, checking for generic containers
-        // Best effort MVP:
-        text = document.body.innerText.substring(0, 10000); // Fallback to raw text for now
+        // Perplexity-specific selectors for better content extraction
+        const answerSelectors = [
+            '[data-testid="answer-block"]',
+            '.prose',
+            '[class*="AnswerBlock"]',
+            'article',
+            '.markdown'
+        ];
+
+        let extracted = false;
+        for (const selector of answerSelectors) {
+            const elements = document.querySelectorAll(selector);
+            if (elements.length > 0) {
+                elements.forEach((el, index) => {
+                    text += `[Answer ${index + 1}]: ${(el as HTMLElement).innerText}\n\n`;
+                });
+                extracted = true;
+                break;
+            }
+        }
+
+        // Fallback to raw text if no specific selectors match
+        if (!extracted) {
+            text = document.body.innerText.substring(0, 10000);
+        }
     } else if (url.includes('gemini.google.com')) {
         document.querySelectorAll('message-content').forEach((el) => {
             text += `[Gemini]: ${(el as HTMLElement).innerText}\n`;
@@ -35,3 +57,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ text, url: window.location.href });
     }
 });
+
+// Memory Search Panel Integration (shared module)
+import { initSearchPanel } from './initSearchPanel';
+
+// Initialize search panel with keyboard shortcut
+initSearchPanel();

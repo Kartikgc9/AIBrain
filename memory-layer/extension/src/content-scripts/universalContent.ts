@@ -1,4 +1,5 @@
 // Platform-specific DOM selectors and button injection logic
+import { detectPlatform as detectPlatformName } from './insertMemory';
 
 interface PlatformConfig {
     name: string;
@@ -150,6 +151,26 @@ function getConversationText(): string {
     }
 
     if (hostname.includes('perplexity.ai')) {
+        // Perplexity-specific selectors for better content extraction
+        const answerSelectors = [
+            '[data-testid="answer-block"]',
+            '.prose',
+            '[class*="AnswerBlock"]',
+            'article',
+            '.markdown'
+        ];
+
+        for (const selector of answerSelectors) {
+            const elements = document.querySelectorAll(selector);
+            if (elements.length > 0) {
+                return Array.from(elements)
+                    .map(el => (el as HTMLElement).innerText)
+                    .filter(Boolean)
+                    .join('\n\n');
+            }
+        }
+
+        // Fallback to raw text if no specific selectors match
         return document.body.innerText.substring(0, 10000);
     }
 
@@ -162,15 +183,19 @@ function getConversationText(): string {
     return document.body.innerText.substring(0, 10000);
 }
 
+// Map human-readable platform names to config keys
+const platformNameToKey: Record<string, string> = {
+    'ChatGPT': 'chatgpt',
+    'Claude': 'claude',
+    'Perplexity': 'perplexity',
+    'Gemini': 'gemini',
+    'Grok': 'grok'
+};
+
 function detectPlatform(): string | null {
-    const hostname = window.location.hostname;
-
-    if (hostname.includes('chatgpt.com') || hostname.includes('openai.com')) return 'chatgpt';
-    if (hostname.includes('claude.ai')) return 'claude';
-    if (hostname.includes('perplexity.ai')) return 'perplexity';
-    if (hostname.includes('gemini.google.com')) return 'gemini';
-
-    return null;
+    const platformName = detectPlatformName();
+    if (platformName === 'Unknown') return null;
+    return platformNameToKey[platformName] || null;
 }
 
 function injectButton() {
@@ -220,5 +245,11 @@ document.addEventListener('keydown', (e) => {
         }
     }
 });
+
+// Memory Search Panel Integration (shared module)
+import { initSearchPanel } from './initSearchPanel';
+
+// Initialize search panel with keyboard shortcut
+initSearchPanel();
 
 export { };

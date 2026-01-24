@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: aibrain-postgres
+    environment:
+      POSTGRES_DB: aibrain_dev
+      POSTGRES_USER: aibrain
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aibrain"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aibrain-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: aibrain-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aibrain-network
+
+  server:
+    build: .
+    container_name: aibrain-server
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://aibrain:dev_password@postgres:5432/aibrain_dev
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev_secret_change_in_production_min_32_chars_required
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      CORS_ORIGIN: "*"
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - aibrain-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  aibrain-network:
+    driver: bridge
