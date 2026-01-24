@@ -18,7 +18,6 @@ build/
 # IDE and editors
 .vscode/
 .idea/
-.claude/
 *.swp
 *.swo
 *~
@@ -33,9 +32,6 @@ memory-layer/memory-engine/data/
 
 # Reference code (76MB, not needed in main repo)
 external/
-
-# Tool-specific files
-.clinerules
 
 # Extension build artifacts
 memory-layer/extension/dist/
