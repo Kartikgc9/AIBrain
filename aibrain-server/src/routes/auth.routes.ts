@@ -16,7 +16,14 @@ const loginSchema = z.object({
 
 const authRoutes: FastifyPluginAsync = async (fastify) => {
   // Register new user
-  fastify.post('/auth/register', async (request, reply) => {
+  fastify.post('/auth/register', {
+    config: {
+      rateLimit: {
+        max: 5,
+        timeWindow: '15 minutes'
+      }
+    }
+  }, async (request, reply) => {
     try {
       const { email, password } = registerSchema.parse(request.body);
 
@@ -44,7 +51,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         }
       });
     } catch (error: any) {
-      console.error('[API] Register error:', error);
+      request.log.error({ err: error }, 'Register error');
 
       if (error.message === 'User already exists') {
         return reply.code(409).send({ success: false, error: error.message });
@@ -55,7 +62,14 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Login user
-  fastify.post('/auth/login', async (request, reply) => {
+  fastify.post('/auth/login', {
+    config: {
+      rateLimit: {
+        max: 10,
+        timeWindow: '15 minutes'
+      }
+    }
+  }, async (request, reply) => {
     try {
       const { email, password } = loginSchema.parse(request.body);
 
@@ -90,7 +104,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         }
       });
     } catch (error: any) {
-      console.error('[API] Login error:', error);
+      request.log.error({ err: error }, 'Login error');
       reply.code(400).send({ success: false, error: error.message });
     }
   });
@@ -107,7 +121,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
 
       reply.send({ success: true, message: 'Logged out successfully' });
     } catch (error: any) {
-      console.error('[API] Logout error:', error);
+      request.log.error({ err: error }, 'Logout error');
       reply.code(500).send({ success: false, error: error.message });
     }
   });
@@ -140,7 +154,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         }
       });
     } catch (error: any) {
-      console.error('[API] Refresh token error:', error);
+      request.log.error({ err: error }, 'Refresh token error');
       reply.code(500).send({ success: false, error: error.message });
     }
   });
@@ -168,7 +182,7 @@ const authRoutes: FastifyPluginAsync = async (fastify) => {
         }
       });
     } catch (error: any) {
-      console.error('[API] Get user error:', error);
+      request.log.error({ err: error }, 'Get user error');
       reply.code(500).send({ success: false, error: error.message });
     }
   });

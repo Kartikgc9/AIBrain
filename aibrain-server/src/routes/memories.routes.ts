@@ -88,7 +88,7 @@ const memoriesRoutes: FastifyPluginAsync = async (fastify) => {
 
       reply.code(201).send({ success: true, memory });
     } catch (error: any) {
-      console.error('[API] Create memory error:', error);
+      request.log.error({ err: error }, 'Create memory error');
       reply.code(400).send({ success: false, error: error.message });
     }
   });
@@ -112,7 +112,7 @@ const memoriesRoutes: FastifyPluginAsync = async (fastify) => {
 
       reply.send({ success: true, memory });
     } catch (error: any) {
-      console.error('[API] Get memory error:', error);
+      request.log.error({ err: error }, 'Get memory error');
       reply.code(500).send({ success: false, error: error.message });
     }
   });
@@ -147,7 +147,7 @@ const memoriesRoutes: FastifyPluginAsync = async (fastify) => {
 
       reply.send({ success: true, memory });
     } catch (error: any) {
-      console.error('[API] Update memory error:', error);
+      request.log.error({ err: error }, 'Update memory error');
       reply.code(400).send({ success: false, error: error.message });
     }
   });
@@ -168,7 +168,7 @@ const memoriesRoutes: FastifyPluginAsync = async (fastify) => {
 
       reply.send({ success: true, message: 'Memory deleted' });
     } catch (error: any) {
-      console.error('[API] Delete memory error:', error);
+      request.log.error({ err: error }, 'Delete memory error');
       reply.code(500).send({ success: false, error: error.message });
     }
   });
@@ -197,14 +197,20 @@ const memoriesRoutes: FastifyPluginAsync = async (fastify) => {
 
       reply.send({ success: true, memories, count: memories.length });
     } catch (error: any) {
-      console.error('[API] List memories error:', error);
+      request.log.error({ err: error }, 'List memories error');
       reply.code(500).send({ success: false, error: error.message });
     }
   });
 
   // Search memories
   fastify.post('/memories/search', {
-    onRequest: [fastify.authenticate]
+    onRequest: [fastify.authenticate],
+    config: {
+      rateLimit: {
+        max: 50,
+        timeWindow: '1 minute'
+      }
+    }
   }, async (request, reply) => {
     try {
       const data = searchSchema.parse(request.body);
@@ -234,14 +240,20 @@ const memoriesRoutes: FastifyPluginAsync = async (fastify) => {
 
       reply.send({ success: true, memories, count: memories.length });
     } catch (error: any) {
-      console.error('[API] Search memories error:', error);
+      request.log.error({ err: error }, 'Search memories error');
       reply.code(400).send({ success: false, error: error.message });
     }
   });
 
   // Ingest conversation and extract memories
   fastify.post('/memories/ingest', {
-    onRequest: [fastify.authenticate]
+    onRequest: [fastify.authenticate],
+    config: {
+      rateLimit: {
+        max: 20,
+        timeWindow: '1 hour'
+      }
+    }
   }, async (request, reply) => {
     try {
       const data = ingestSchema.parse(request.body);
@@ -278,14 +290,20 @@ const memoriesRoutes: FastifyPluginAsync = async (fastify) => {
         message: `Extracted and saved ${memories.length} memories`
       });
     } catch (error: any) {
-      console.error('[API] Ingest error:', error);
+      request.log.error({ err: error }, 'Ingest error');
       reply.code(500).send({ success: false, error: error.message });
     }
   });
 
   // Import memories (for migration)
   fastify.post('/memories/import', {
-    onRequest: [fastify.authenticate]
+    onRequest: [fastify.authenticate],
+    config: {
+      rateLimit: {
+        max: 5,
+        timeWindow: '1 hour'
+      }
+    }
   }, async (request, reply) => {
     try {
       const data = importSchema.parse(request.body);
@@ -325,7 +343,7 @@ const memoriesRoutes: FastifyPluginAsync = async (fastify) => {
         message: `Imported ${imported.length} memories, skipped ${importMemories.length - imported.length} duplicates`
       });
     } catch (error: any) {
-      console.error('[API] Import error:', error);
+      request.log.error({ err: error }, 'Import error');
       reply.code(500).send({ success: false, error: error.message });
     }
   });
@@ -346,7 +364,7 @@ const memoriesRoutes: FastifyPluginAsync = async (fastify) => {
 
       reply.send({ success: true, memories, count: memories.length });
     } catch (error: any) {
-      console.error('[API] Sync updates error:', error);
+      request.log.error({ err: error }, 'Sync updates error');
       reply.code(500).send({ success: false, error: error.message });
     }
   });

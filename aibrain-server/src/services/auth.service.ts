@@ -1,26 +1,11 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../config/database.js';
 import { users, type User, type NewUser } from '../db/schema.js';
-import { createHash, randomBytes } from 'crypto';
+import bcrypt from 'bcrypt';
+
+const BCRYPT_ROUNDS = 10;
 
 export class AuthService {
-  /**
-   * Hash password using SHA-256
-   * In production, use bcrypt or argon2 for better security
-   */
-  private hashPassword(password: string, salt: string): string {
-    return createHash('sha256')
-      .update(password + salt)
-      .digest('hex');
-  }
-
-  /**
-   * Generate a random salt
-   */
-  private generateSalt(): string {
-    return randomBytes(16).toString('hex');
-  }
-
   /**
    * Register a new user
    */
@@ -31,9 +16,8 @@ export class AuthService {
       throw new Error('User already exists');
     }
 
-    // Hash password with salt
-    const salt = this.generateSalt();
-    const passwordHash = this.hashPassword(password, salt) + ':' + salt;
+    // Hash password with bcrypt
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
     // Create user
     const [user] = await db.insert(users).values({
@@ -52,11 +36,8 @@ export class AuthService {
     const user = await this.getUserByEmail(email);
     if (!user) return null;
 
-    // Extract salt from password hash
-    const [hash, salt] = user.passwordHash.split(':');
-    const providedHash = this.hashPassword(password, salt);
-
-    if (hash !== providedHash) {
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) {
       return null;
     }
 

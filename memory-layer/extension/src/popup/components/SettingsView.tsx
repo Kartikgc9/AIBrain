@@ -6,16 +6,28 @@ export function SettingsView() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        chrome.storage.sync.get(['openai_api_key'], (result) => {
-            if (result.openai_api_key) {
-                setApiKey(result.openai_api_key);
+        // Migration: move API key from sync to local storage
+        chrome.storage.sync.get(['openai_api_key'], (syncResult) => {
+            if (syncResult.openai_api_key) {
+                // Migrate to local storage and remove from sync
+                chrome.storage.local.set({ openai_api_key: syncResult.openai_api_key }, () => {
+                    chrome.storage.sync.remove('openai_api_key');
+                });
+                setApiKey(syncResult.openai_api_key);
+                setLoading(false);
+            } else {
+                chrome.storage.local.get(['openai_api_key'], (result) => {
+                    if (result.openai_api_key) {
+                        setApiKey(result.openai_api_key);
+                    }
+                    setLoading(false);
+                });
             }
-            setLoading(false);
         });
     }, []);
 
     const handleSave = () => {
-        chrome.storage.sync.set({ openai_api_key: apiKey }, () => {
+        chrome.storage.local.set({ openai_api_key: apiKey }, () => {
             setSaved(true);
             setTimeout(() => setSaved(false), 2000);
         });

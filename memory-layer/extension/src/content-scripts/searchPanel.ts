@@ -474,8 +474,13 @@ class MemorySearchPanel {
             return;
         }
 
-        resultsList.innerHTML = this.state.results.map((memory, index) => `
-            <div class="aibrain-memory-card ${index === this.state.selectedIndex ? 'selected' : ''}" data-index="${index}" style="
+        resultsList.innerHTML = '';
+
+        this.state.results.forEach((memory, index) => {
+            const card = document.createElement('div');
+            card.className = `aibrain-memory-card ${index === this.state.selectedIndex ? 'selected' : ''}`;
+            card.dataset.index = String(index);
+            card.style.cssText = `
                 background: ${index === this.state.selectedIndex ? '#2a2a2a' : '#1e1e1e'};
                 border: 1px solid ${index === this.state.selectedIndex ? '#667eea' : '#333'};
                 border-radius: 8px;
@@ -483,64 +488,78 @@ class MemorySearchPanel {
                 margin-bottom: 8px;
                 cursor: pointer;
                 transition: all 0.2s;
-            " onmouseover="this.style.background='#2a2a2a'; this.style.borderColor='#667eea'" onmouseout="if (!this.classList.contains('selected')) { this.style.background='#1e1e1e'; this.style.borderColor='#333' }">
-                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
-                    <div style="display: flex; gap: 6px;">
-                        <span style="
-                            background: ${this.getTypeColor(memory.type)};
-                            color: white;
-                            padding: 2px 8px;
-                            border-radius: 4px;
-                            font-size: 10px;
-                            font-weight: 600;
-                            text-transform: uppercase;
-                        ">${memory.type}</span>
-                        <span style="
-                            background: #333;
-                            color: #a0a0a0;
-                            padding: 2px 8px;
-                            border-radius: 4px;
-                            font-size: 10px;
-                        ">${memory.scope}</span>
-                    </div>
-                    <button class="aibrain-insert-btn" data-index="${index}" style="
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        border: none;
-                        color: white;
-                        padding: 4px 12px;
-                        border-radius: 4px;
-                        font-size: 11px;
-                        font-weight: 600;
-                        cursor: pointer;
-                        transition: transform 0.2s;
-                    " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">Insert</button>
-                </div>
-                <div style="font-size: 13px; line-height: 1.5; color: #e0e0e0; margin-bottom: 8px;">
-                    ${this.truncate(memory.content, 120)}
-                </div>
-                <div style="font-size: 11px; color: #666; display: flex; gap: 12px;">
-                    ${memory.source?.platform ? `<span>📍 ${memory.source.platform}</span>` : ''}
-                    <span>🕒 ${this.formatDate(memory.createdAt)}</span>
-                </div>
-            </div>
-        `).join('');
-
-        // Add click listeners to insert buttons
-        resultsList.querySelectorAll('.aibrain-insert-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const index = parseInt((e.target as HTMLElement).dataset.index || '0');
-                this.insertMemory(this.state.results[index]);
+            `;
+            card.addEventListener('mouseover', () => {
+                card.style.background = '#2a2a2a';
+                card.style.borderColor = '#667eea';
             });
-        });
-
-        // Add click listeners to cards for selection
-        resultsList.querySelectorAll('.aibrain-memory-card').forEach(card => {
+            card.addEventListener('mouseout', () => {
+                if (!card.classList.contains('selected')) {
+                    card.style.background = '#1e1e1e';
+                    card.style.borderColor = '#333';
+                }
+            });
             card.addEventListener('click', () => {
-                const index = parseInt((card as HTMLElement).dataset.index || '0');
                 this.state.selectedIndex = index;
                 this.updateSelection();
             });
+
+            // Header row
+            const headerRow = document.createElement('div');
+            headerRow.style.cssText = 'display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;';
+
+            const badges = document.createElement('div');
+            badges.style.cssText = 'display: flex; gap: 6px;';
+
+            const typeBadge = document.createElement('span');
+            typeBadge.style.cssText = `background: ${this.getTypeColor(memory.type)}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase;`;
+            typeBadge.textContent = memory.type;
+
+            const scopeBadge = document.createElement('span');
+            scopeBadge.style.cssText = 'background: #333; color: #a0a0a0; padding: 2px 8px; border-radius: 4px; font-size: 10px;';
+            scopeBadge.textContent = memory.scope;
+
+            badges.appendChild(typeBadge);
+            badges.appendChild(scopeBadge);
+
+            const insertBtn = document.createElement('button');
+            insertBtn.className = 'aibrain-insert-btn';
+            insertBtn.dataset.index = String(index);
+            insertBtn.style.cssText = 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: white; padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: 600; cursor: pointer; transition: transform 0.2s;';
+            insertBtn.textContent = 'Insert';
+            insertBtn.addEventListener('mouseover', () => { insertBtn.style.transform = 'scale(1.05)'; });
+            insertBtn.addEventListener('mouseout', () => { insertBtn.style.transform = 'scale(1)'; });
+            insertBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.insertMemory(this.state.results[index]);
+            });
+
+            headerRow.appendChild(badges);
+            headerRow.appendChild(insertBtn);
+
+            // Content
+            const contentDiv = document.createElement('div');
+            contentDiv.style.cssText = 'font-size: 13px; line-height: 1.5; color: #e0e0e0; margin-bottom: 8px;';
+            contentDiv.textContent = this.truncate(memory.content, 120);
+
+            // Footer
+            const footerDiv = document.createElement('div');
+            footerDiv.style.cssText = 'font-size: 11px; color: #666; display: flex; gap: 12px;';
+
+            if (memory.source?.platform) {
+                const platformSpan = document.createElement('span');
+                platformSpan.textContent = `📍 ${memory.source.platform}`;
+                footerDiv.appendChild(platformSpan);
+            }
+
+            const dateSpan = document.createElement('span');
+            dateSpan.textContent = `🕒 ${this.formatDate(memory.createdAt)}`;
+            footerDiv.appendChild(dateSpan);
+
+            card.appendChild(headerRow);
+            card.appendChild(contentDiv);
+            card.appendChild(footerDiv);
+            resultsList.appendChild(card);
         });
     }
 
