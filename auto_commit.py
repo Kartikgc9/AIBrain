@@ -105,25 +105,40 @@ def main() -> int:
     first_run = state.get("FIRST_RUN_UTC", "").strip()
     last_run  = state.get("LAST_RUN_UTC",  "").strip()
 
-    # 2. Increment counter
+    # 2. Idempotency guard — skip if already committed today (UTC date)
+    #    This means it's safe to fire on startup/logon after a missed schedule:
+    #    the task will run once on wake-up and be a no-op on any later trigger
+    #    the same calendar day.
+    if last_run:
+        try:
+            last_run_date = datetime.fromisoformat(
+                last_run.replace("Z", "+00:00")
+            ).date()
+            if last_run_date >= now_utc.date():
+                log(f"Already committed today ({last_run_date}) — skipping.")
+                return 0
+        except Exception:
+            pass  # malformed date: proceed normally
+
+    # 3. Increment counter
     count += 1
     log(f"Commit #{count}")
 
-    # 3. Preserve or set first-run timestamp
+    # 4. Preserve or set first-run timestamp
     if not first_run:
         first_run = now_str
         log(f"First run recorded: {first_run}")
 
-    # 4. Compute uptime
+    # 5. Compute uptime
     uptime_days, uptime_hours = compute_uptime(first_run, now_utc)
 
-    # 5. Build summary string
+    # 6. Build summary string
     summary = (
         f"Run #{count} on {now_human} | "
         f"Uptime: {uptime_days}d {uptime_hours:.1f}h since first run"
     )
 
-    # 6. Write updated tracker.py
+    # 7. Write updated tracker.py
     try:
         write_tracker(count, first_run, now_str, uptime_days, uptime_hours, summary)
         log("tracker.py updated successfully")
